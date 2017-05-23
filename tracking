@@ -1,0 +1,206 @@
+import cv2
+import numpy as np
+
+drawing = False
+rectangle = 0       #設定框選區域初始值
+rectangle_1 = 0
+
+
+#角點偵測副程式
+def keypoint(input_img):
+    
+    feature_params = dict(maxCorners=500,       #設定角點偵測函數
+                          qualityLevel=0.3,
+                          minDistance=7,
+                          blockSize=7,
+                          useHarrisDetector=False,
+                          k=0.04)
+    
+    corners = cv2.goodFeaturesToTrack(input_img ,**feature_params)
+    corners = np.int0(corners)                  #使其化為整數
+    
+    #print('corners=' ,corners)
+    return corners
+
+#劃出角點之副程式
+def draw_point(input_img ,kp ,ix ,iy, x, y):
+    
+    for i in kp:
+        n,m = i.ravel()                         #使kp內的值返回
+        n = n + ix
+        m = m + iy
+        cv2.circle(input_img ,(n,m) ,2 ,255 ,-1)
+        cv2.rectangle(input_img,(ix,iy),(x,y),(0,255,255),1)              #起始值ix,iy 終點x,y
+                
+    return input_img
+
+def ROI_point(n, m, ix, iy):
+     
+    n = n + ix
+    m = m + iy
+        
+    return (n, m)
+
+def lk_track(old_input, old, new, kp, kp_1, frame):           #抓img 但抓下一幀時抓的是全圖
+        
+    color = np.random.randint(0,255,(100,3))
+    
+    lk_params = dict( winSize=(15,15),     
+              maxLevel=2,     
+              criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT,10, 0.03))
+
+    
+    mask = np.zeros_like(old_input)
+    
+    kp = np.float32(kp).reshape(-1, 1, 2)
+    kp_1 = np.float32(kp_1).reshape(-1, 1, 2)
+    p0,  st_1,  err  =  cv2.calcOpticalFlowPyrLK(old, new, kp, None, **lk_params)
+    p1,  st,  err  =  cv2.calcOpticalFlowPyrLK(new, old, kp_1, None, **lk_params)
+
+    good_new = kp_1[st_1==1]
+    good_old = kp[st==1]
+
+    for i,(new,old) in enumerate(zip(good_new, good_old)):      #只能抓取一組
+        a,b = new.ravel()
+        c,d = old.ravel()
+        cv2.line(mask,(a,b),(c,d),color[i].tolist(),1)
+        cv2.circle(frame,(a,b),2, color[i].tolist(),-1)
+        cv2.circle(frame,(c,d),2, color[i].tolist(),-1)
+        
+    new_input = cv2.add(frame, mask)
+   
+    return new_input
+
+#畫方框之副程式
+def draw_circle(event,x,y,flags,param):
+    
+    global ix,iy,drawing,rectangle
+    #滑鼠按下
+    if event == cv2.EVENT_LBUTTONDOWN:
+        drawing = True
+        ix,iy = x,y
+        #print('ix=',ix)
+        #print('iy=',iy)
+    #滑鼠放開    
+    elif event == cv2.EVENT_LBUTTONUP:
+        drawing = False
+        
+        #cv2.rectangle(img,(ix,iy),(x,y),(0,255,255),1)              #起始值ix,iy 終點x,y
+        #print('x=',x)
+        #print('y=',y)
+        rectangle = [ix, iy, x, y]          #rectangle內將有4個值
+        
+img = cv2.imread('left.jpg')
+cv2.namedWindow('image')
+cv2.setMouseCallback('image',draw_circle)
+
+while(1):
+    k = cv2.waitKey(1) & 0xff
+    cv2.imshow('image',img)
+    #print("rectangle:",rectangle)
+    if k == 27 or rectangle !=0:            #畫框完跳出此副程式
+        break
+cv2.destroyAllWindows
+
+#畫影像二方格
+def draw_circle_1(event,x,y,flags,param):
+    
+    global ix,iy,drawing,rectangle_1
+    #滑鼠按下
+    if event == cv2.EVENT_LBUTTONDOWN:
+        drawing = True
+        ix,iy = x,y
+        #print('ix=',ix)
+        #print('iy=',iy)
+    #滑鼠放開    
+    elif event == cv2.EVENT_LBUTTONUP:
+        drawing = False
+        
+        cv2.rectangle(img_1,(ix,iy),(x,y),(0,255,255),1)              #起始值ix,iy 終點x,y
+        #print('x=',x)
+        #print('y=',y)
+        rectangle_1 = [ix, iy, x, y]          #rectangle內將有4個值
+        
+img_1 = cv2.imread('right.jpg')
+cv2.namedWindow('image_1')
+cv2.setMouseCallback('image_1',draw_circle_1)
+
+while(1):
+    k = cv2.waitKey(1) & 0xff
+    cv2.imshow('image_1',img_1)
+    #print("rectangle_1:",rectangle_1)
+    if k == 27 or rectangle_1 !=0:            #畫框完跳出此副程式
+        break
+cv2.destroyAllWindows
+
+
+#==============================================================================
+# 主程式
+#==============================================================================
+img = cv2.imread('left.jpg')
+img_1 = cv2.imread('right.jpg')
+
+#將四點提出 影像一
+ix = rectangle[0]
+iy = rectangle[1]
+x = rectangle[2]
+y = rectangle[3]
+
+#影像二
+ix_1 = rectangle_1[0]
+iy_1 = rectangle_1[1]
+x_1 = rectangle_1[2]
+y_1 = rectangle_1[3]
+
+
+#做角點前先轉為灰階圖  影樣一
+gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+gray = cv2.equalizeHist(gray)
+
+#影像二
+gray_1 = cv2.cvtColor(img_1, cv2.COLOR_BGR2GRAY)
+gray_1 = cv2.equalizeHist(gray_1)
+
+
+roiimg = gray[iy:y, ix:x]       #ROI作圖  影像一
+roiimg_1 = gray_1[iy_1:y_1, ix_1:x_1]       #影像二
+
+#==============================================================================
+# #==============================================================================
+# # show roi
+# #==============================================================================
+# cv2.namedWindow('roiimg')
+# cv2.imshow('roiimg',roiimg)
+#==============================================================================
+
+kp = keypoint(roiimg)           #尋找角點   影像一
+kp_1 = keypoint(roiimg_1)       #影像二
+
+               
+img = draw_point(img, kp, ix, iy, x, y)       #劃出角點位置  影像一
+img_1 = draw_point(img_1, kp_1, ix_1, iy_1, x_1, y_1)   #影像二
+
+                 
+for i in kp:
+    n,m = i.ravel()
+    p0 = ROI_point(n, m, ix, iy)
+    #print('p0 = ',p0)
+    for i in kp_1:
+        a,b = i.ravel()
+        p1 = ROI_point(a, b, ix_1, iy_1)
+        img_2 = lk_track(img, gray, gray_1, p0, p1, img_1)
+
+while(1):
+    k = cv2.waitKey(1) & 0xff
+    cv2.namedWindow('image')
+    cv2.imshow('image',img)
+    
+    cv2.namedWindow('image_1')
+    cv2.imshow('image_1',img_1)
+    
+    cv2.namedWindow('image_2') 
+    cv2.imshow('image_2',img_2)
+   
+    if k == 27:
+        break
+cv2.destroyAllWindows
