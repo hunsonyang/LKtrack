@@ -1,0 +1,36 @@
+import cv2
+import numpy as np
+global px,py    
+
+drawing = False 
+ix,iy = -1,-1
+
+
+def draw_circle(event,x,y,flags,param):
+    
+    global ix,iy,drawing
+    #Click 
+    if event == cv2.EVENT_LBUTTONDOWN:
+        drawing = True
+        ix,iy = x,y
+        print('ix=',ix)
+        print('iy=',iy)
+
+
+    elif event == cv2.EVENT_LBUTTONUP:
+        drawing = False
+        
+        cv2.rectangle(img,(ix,iy),(x,y),(0,255,255),0)
+
+img = cv2.imread('a.jpg')
+cv2.namedWindow('image')
+cv2.setMouseCallback('image',draw_circle)
+
+while(1):
+ 
+    cv2.imshow('image',img)
+    k = cv2.waitKey(1) & 0xFF
+    if k == 27:
+        break
+
+cv2.destroyAllWindows()
